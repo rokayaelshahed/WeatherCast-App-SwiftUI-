@@ -4,83 +4,140 @@
 //
 //  Created by Rokaya El Shahed on 12/02/2025.
 //
-
 import SwiftUI
-import CoreData
 
-struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
+struct WeatherView: View {
+    @StateObject var weatherAPI = WeatherAPI()
+    @StateObject var locationManager = LocationManager()
 
     var body: some View {
         NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+            ZStack {
+                backgroundView()
+                
+                VStack {
+                    if let city = locationManager.cityName {
+                                    
+                    if let weather = weatherAPI.weatherData {
+                        VStack {
+                            Text(weather.location.name)
+                                .font(.largeTitle)
+                                .bold()
+                            
+                            Text(weather.current.condition.text)
+                                .font(.title2)
+                            
+                            Text("\(Int(weather.current.temp_c))°C")
+                                .font(.system(size: 50, weight: .bold))
+                            
+                            Text("H: \(Int(weather.forecast.forecastday[0].day.maxtemp_c))°C L: \(Int(weather.forecast.forecastday[0].day.mintemp_c))°C")
+                                .font(.subheadline)
+                        }
+                        .foregroundColor(.white)
+                        
+                 //       Spacer()
+                        
+                        VStack(alignment: .leading) {
+                            Text("3-DAY FORECAST")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.leading)
+
+                       
+                                VStack(alignment: .leading) {
+                                    ForEach(weather.forecast.forecastday) { day in
+                                        NavigationLink(destination: HoursView(forecast: day)) {
+                                            ForecastRow(day: day)
+                                        }
+                                    }
+                                }
+        
+                        }
+                        .frame( alignment: .leading)
+                        VStack(alignment: .leading) {
+                            LazyVGrid(columns: [GridItem(.flexible(),spacing: 10), GridItem(.flexible(),spacing: 10)], spacing: 20) {
+                            WeatherDetail(title: "Humidity", value: "\(weather.current.humidity)%")
+                            WeatherDetail(title: "Pressure", value: "\(Int(weather.current.pressure_mb)) mb")
+                            WeatherDetail(title: "Visibility", value: "\(Int(weather.current.vis_km)) km")
+                            WeatherDetail(title: "Feels like", value: "\(Int(weather.current.feelslike_c)) °C")
+
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.leading, 10)
+                      // .padding()
+
+                    } else {
+                        ProgressView("Loading...")
+                            .onAppear {
+                                weatherAPI.fetchWeather(city: city)
+                                }
+                            }
                     }
                 }
-                .onDelete(perform: deleteItems)
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
+          .edgesIgnoringSafeArea(.all)
         }
     }
 }
 
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
+
+
+func backgroundView() -> some View {
+    let hour = Calendar.current.component(.hour, from: Date())
+    let background = hour >= 6 && hour < 18 ? "morning-bg" : "night-bg"
+    return Image(background)
+        .resizable()
+        .scaledToFill()
+        .overlay(Color.black.opacity(0.3))
+}
+
+
+struct ForecastRow: View {
+    let day: ForecastDay
+    
+    var body: some View {
+        HStack {
+            Text(day.date)
+                .font(.headline)
+                .foregroundColor(.white)
+            AsyncImage(url: URL(string: "https:\(day.day.condition.icon)")) { image in
+                image.resizable()
+            } placeholder: {
+                ProgressView()
+            }
+            .frame(width: 50, height: 50)
+            
+            Text("\(Int(day.day.mintemp_c))°C - \(Int(day.day.maxtemp_c))°C")
+                .font(.subheadline)
+                .foregroundColor(.white)
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.2)))
+    }
+}
+
+
+struct WeatherDetail: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        VStack {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.white)
+            Text(value)
+                .font(.title2)
+                .bold()
+                .foregroundColor(.white)
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.2)))
+    }
+}
+
+
 
 #Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    WeatherView()
 }
