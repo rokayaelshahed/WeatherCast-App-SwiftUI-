@@ -18,6 +18,6 @@ A SwiftUI-based iOS weather app that provides real-time weather updates and a 3-
 
 | Screenshot 1 | Screenshot 2 |
 |--------------|--------------|
-| ![Screen1](Screen1.png) | ![Screen2](Screen2.png) |
+| ![Screen1](Screenshot1.png) | ![Screen2](Screenshot2.png) |
 
 
